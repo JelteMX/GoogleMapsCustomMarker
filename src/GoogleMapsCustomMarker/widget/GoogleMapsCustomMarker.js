@@ -61,7 +61,7 @@ define([
         _progressID: null,
         _markersArr: [],
         _objects: [],
-        _markerClusterer        : null,
+        _markerClusterer: null,
         _handle: null,
         _contextObj: null,
         _googleMap: null,
@@ -76,7 +76,7 @@ define([
         _resizeTimer: null,
 
         postCreate: function () {
-
+            logger.debug(this.id + ".postCreate");
             // if dragging enabled, add on click event to checkbox
             if (this.toggleDraggingOpt){
 
@@ -101,9 +101,14 @@ define([
                 this.domNode.removeChild(this.toggleNodeDiv);
             }
 
-        },
-        update: function (obj, callback) {
+            this.addOnDestroy(lang.hitch(this, function () {
+                window[this.id + "_mapsCallback"] = null;
+            }));
 
+            window._googleMarkerMap = this;
+        },
+
+        update: function (obj, callback) {
             logger.debug(this.id + ".update");
             if (obj){
                 this._contextObj = obj;
@@ -152,6 +157,7 @@ define([
                 }
             }
         },
+
         resize: function (box) {
             if (this._googleMap) {
                 if (this._resizeTimer) {
@@ -166,6 +172,7 @@ define([
                 }), 250);
             }
         },
+
        _waitForGoogleLoad: function (callback) {
             logger.debug(this.id + "._waitForGoogleLoad");
             var interval = null,
@@ -185,10 +192,9 @@ define([
             });
             interval = setInterval(intervalFunc, 1);
         },
-        uninitialize: function () {
-            window[this.id + "_mapsCallback"] = null;
-        },
+
         _resetSubscriptions: function () {
+            logger.debug(this.id + "._resetSubscriptions");
             if (this._handle) {
                 this.unsubscribe(this._handle);
                 this._handle = null;
@@ -200,6 +206,7 @@ define([
                     callback: lang.hitch(this, function (guid) {
                         // 20170611 - if contextobject is actual mapEntity object, no need to retrieve from DB again, since we have it already as context
                         if (this._contextObj && this.mapEntity === this._contextObj.getEntity()){
+                            logger.debug(this.id + ".subscription fired");
                             this.parseObjects([ this._contextObj ]);
                         } else {
                             this._loadMap();
@@ -208,8 +215,9 @@ define([
                 });
             }
         },
-        _loadMap: function (callback) {
 
+        _loadMap: function (callback) {
+            logger.debug(this.id + "._loadMap");
             // load geocoder for reverse geocoding after dragging of marker
             this.geocoder = new google.maps.Geocoder();
 
@@ -342,8 +350,9 @@ define([
             this._executeCallback(callback);
 
         },
-        _createLegend : function(){
 
+        _createLegend : function(){
+            logger.debug(this.id + "._createLegend");
             var legendItemSize = 0;
 
             var legendDiv = dom.create("div",{
@@ -438,35 +447,30 @@ define([
             this._googleMap.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(legendDiv);
 
         },
-        _fetchMarkers: function () {
 
+        _fetchMarkers: function () {
+            logger.debug(this.id + "._fetchMarkers");
             this._markersArr = [];
             // 20170613 - Added check whether no context object is available. Pan to context was not properly working.
             if (this.gotocontext & !this._contextObj) {
-
                 this._goToContext();
             } else if (this._contextObj && this.xpathConstraint.indexOf("[id='[%CurrentObject%]']") > -1){
-
                 this.parseObjects( [this._contextObj] );
             } else {
                 if (this.updateRefresh) {
-
                     this._fetchFromDBOrDS();
-
                 } else {
                     if (this._markerCache) {
                         this._fetchFromCache();
-
                     } else {
                         this._fetchFromDBOrDS();
-
                     }
                 }
             }
-
         },
-        _refreshMap: function (objs) {
 
+        _refreshMap: function (objs) {
+            logger.debug(this.id + "._refreshMap");
             var bounds = new google.maps.LatLngBounds();
             var panPosition = this._defaultPosition;
             var validCount = 0;
@@ -475,9 +479,10 @@ define([
             valueOfLat = null,
             valueOfLng = null;
 
+            this._removeAllMarkers();
+
             // create markers
             dojoArray.forEach(objs, lang.hitch(this,function (obj) {
-
                 if (this.hideMarkers && this.showLines){
                     // don't plot markers when showLines = true and hideMarkers = true. In all other scenarios do plot markers.
                 } else {
@@ -497,12 +502,9 @@ define([
                     validCount++;
                     panPosition = position;
                 } else {
-
-                    console.error(this._logNode + this.id + ": " + "Incorrect coordinates (" + obj.get(this.latAttr) +
-                                  "," + obj.get(this.lngAttr) + ")");
+                    console.error(this._logNode + this.id + ": " + "Incorrect coordinates (" + obj.get(this.latAttr) + "," + obj.get(this.lngAttr) + ")");
                     console.dir(this);
                 }
-
             }));
 
             // conditionally add a line between the markers baded on Modeler setting
@@ -561,8 +563,9 @@ define([
             }
 
         },
-        _fetchFromDBOrDS: function () {
 
+        _fetchFromDBOrDS: function () {
+            logger.debug(this.id + "._fetchFromDBOrDS");
             // if datasource microflow for objects is configured, use that to retrieve objects
             if (this.getObjectsMF && this._contextObj){
                 if (this.consoleLogging){
@@ -577,7 +580,6 @@ define([
                         this.parseObjects(result);
                     }),
                     error: dojo.hitch(this,function(error) {
-
                         console.log(error.description);
                     })
                 }, this);
@@ -632,6 +634,7 @@ define([
                 }
             }
         },
+
         loadSchema : function (attr, name) {
 
             if (attr !== '') {
@@ -648,8 +651,9 @@ define([
                 }
             }
         },
-        parseObjects : function (objs) {
 
+        parseObjects : function (objs) {
+            logger.debug(this.id + ".parseObjects");
             this._objects = objs;
             var newObjs = [];
             for (var i = 0; i < objs.length; i++) {
@@ -677,6 +681,7 @@ define([
             this._refreshMap(newObjs);
 
         },
+
         checkRef : function (obj, attr, nonRefAttr) {
             if (this._splits && this._splits[attr] && this._splits[attr].length > 1) {
                 var subObj = obj.getChildren(this._splits[attr][0]);
@@ -685,8 +690,9 @@ define([
                 return obj.get(nonRefAttr);
             }
         },
-        _fetchFromCache: function () {
 
+        _fetchFromCache: function () {
+            logger.debug(this.id + "._fetchFromCache");
             if (this.consoleLogging){
                 console.log('fetching from cache');
             }
@@ -721,20 +727,30 @@ define([
             }
 
         },
+
         _removeAllMarkers: function () {
+            logger.debug(this.id + "._removeAllMarkers");
             if (this._markerCache) {
                 dojoArray.forEach(this._markerCache, function (marker) {
                     marker.setMap(null);
                 });
             }
+            if (this._markersArr) {
+                dojoArray.forEach(this._markersArr, function (marker) {
+                    marker.setMap(null);
+                });
+            }
+            this._markerCache = [];
+            this._markersArr = [];
             // Clears all clusters and markers from the clusterer.
             if (this._markerClusterer){
                 this._markerClusterer.clearMarkers();
             }
 
         },
-        _addMarker: function (obj) {
 
+        _addMarker: function (obj) {
+            logger.debug(this.id + "._addMarker");
             var position = new google.maps.LatLng(obj.lat, obj.lng);
             var objGUID;
             // needed to convert from string to number for Google
@@ -888,6 +904,7 @@ define([
             this._markerCache.push(marker);
 
         },
+
         _getLatLng: function (obj) {
             var lat = obj.lat,
                 lng = obj.lng;
@@ -900,6 +917,7 @@ define([
                 return null;
             }
         },
+
         _geocodePosition: function (marker,mxObj,commit) {
 
           var position = marker.getPosition();
@@ -943,13 +961,17 @@ define([
           }));
 
         },
+
         _goToContext: function () {
+            logger.debug(this.id + "._goToContext");
             this._removeAllMarkers();
             if (this._googleMap && this._contextObj) {
                 this._refreshMap([ this._contextObj ]);
             }
         },
+
         _execMf: function (mf, guid, cb) {
+            logger.debug(this.id + "._execMf :: " + mf + " :: " + guid);
             if (this.consoleLogging){
                 console.log(this._logNode + "_execMf");
             }
@@ -974,6 +996,7 @@ define([
                 }, this);
             }
         },
+
         pinSymbol : function(color) {
 
             var pathSymbol;
@@ -1136,6 +1159,7 @@ define([
 
             return symbolOpt;
         },
+
         _toggleMarkerDragging : function(event){
             var node = event.target;
             for (var j=0;j<=this._markersArr.length;j++){
@@ -1148,6 +1172,7 @@ define([
                 }
 
         },
+
         _createSearchBox : function(){
 
             this.searchBoxContainer.style.width = this.searchBoxSize + 'px';
@@ -1191,6 +1216,7 @@ define([
                 }));
             }
         },
+
         _executeCallback: function (cb) {
             if (cb && typeof cb === "function") {
                 cb();
